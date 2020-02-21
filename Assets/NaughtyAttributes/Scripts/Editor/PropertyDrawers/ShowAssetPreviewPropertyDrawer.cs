@@ -13,7 +13,8 @@ namespace NaughtyAttributes.Editor
 				Texture2D previewTexture = GetAssetPreview(property);
 				if (previewTexture != null)
 				{
-					return GetPropertyHeight(property) + GetAssetPreviewSize(property).y;
+					var previewAttribute = PropertyUtility.GetAttribute<ShowAssetPreviewAttribute>(property);
+					return GetPropertyHeight(property) + GetAssetPreviewSize(property, previewAttribute).y;
 				}
 				else
 				{
@@ -45,12 +46,24 @@ namespace NaughtyAttributes.Editor
 				Texture2D previewTexture = GetAssetPreview(property);
 				if (previewTexture != null)
 				{
-					Rect previewRect = new Rect()
+					var previewAttribute = PropertyUtility.GetAttribute<ShowAssetPreviewAttribute>(property);
+					var previewSize = GetAssetPreviewSize(property, previewAttribute);
+					var previewPosition = rect.x + NaughtyEditorGUI.GetIndentLength(rect);
+					switch (previewAttribute.Alignment)
 					{
-						x = rect.x + NaughtyEditorGUI.GetIndentLength(rect),
+						case TextAlignment.Center:
+							previewPosition += (rect.width - previewSize.x) / 2;
+							break;
+						case TextAlignment.Right:
+							previewPosition = rect.max.x - previewSize.x;
+							break;
+					}
+					Rect previewRect = new Rect
+					{
+						x = previewPosition,
 						y = rect.y + EditorGUIUtility.singleLineHeight,
 						width = rect.width,
-						height = GetAssetPreviewSize(property).y
+						height = previewSize.y
 					};
 
 					GUI.Label(previewRect, previewTexture);
@@ -81,7 +94,7 @@ namespace NaughtyAttributes.Editor
 			return null;
 		}
 
-		private Vector2 GetAssetPreviewSize(SerializedProperty property)
+		private Vector2 GetAssetPreviewSize(SerializedProperty property, ShowAssetPreviewAttribute assetPreviewAttribute)
 		{
 			Texture2D previewTexture = GetAssetPreview(property);
 			if (previewTexture == null)
@@ -90,9 +103,8 @@ namespace NaughtyAttributes.Editor
 			}
 			else
 			{
-				ShowAssetPreviewAttribute showAssetPreviewAttribute = PropertyUtility.GetAttribute<ShowAssetPreviewAttribute>(property);
-				int width = Mathf.Clamp(showAssetPreviewAttribute.Width, 0, previewTexture.width);
-				int height = Mathf.Clamp(showAssetPreviewAttribute.Height, 0, previewTexture.height);
+				int width = Mathf.Clamp(assetPreviewAttribute.Width, 0, previewTexture.width);
+				int height = Mathf.Clamp(assetPreviewAttribute.Height, 0, previewTexture.height);
 
 				return new Vector2(width, height);
 			}

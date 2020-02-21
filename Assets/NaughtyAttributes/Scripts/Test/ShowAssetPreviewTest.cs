@@ -16,7 +16,7 @@ namespace NaughtyAttributes.Test
 	[System.Serializable]
 	public class ShowAssetPreviewNest1
 	{
-		[ShowAssetPreview]
+		[ShowAssetPreview(Alignment = TextAlignment.Center)]
 		public Sprite sprite1;
 
 		[ShowAssetPreview(96, 96)]
@@ -28,7 +28,7 @@ namespace NaughtyAttributes.Test
 	[System.Serializable]
 	public class ShowAssetPreviewNest2
 	{
-		[ShowAssetPreview]
+		[ShowAssetPreview(Alignment = TextAlignment.Right)]
 		public Sprite sprite2;
 
 		[ShowAssetPreview(96, 96)]
