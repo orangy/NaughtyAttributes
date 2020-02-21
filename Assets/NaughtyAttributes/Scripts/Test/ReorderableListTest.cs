@@ -13,6 +13,10 @@ namespace NaughtyAttributes.Test
 
 		[ReorderableList]
 		public List<SomeStruct> structList;
+
+		[ReorderableList]
+		[ShowAssetPreview]
+		public List<GameObject> prefabList;
 	}
 
 	[System.Serializable]
