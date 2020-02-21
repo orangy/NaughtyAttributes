@@ -1,14 +1,39 @@
-﻿using UnityEditor;
-using System.Reflection;
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
+using UnityEditor;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace NaughtyAttributes.Editor
 {
 	public static class PropertyUtility
 	{
+		private static MethodInfo _getFieldInfoAndStaticTypeFromProperty;
+
+		static PropertyUtility()
+		{
+			var assembly = typeof(SceneView).Assembly;
+			var utility = assembly.GetType("UnityEditor.ScriptAttributeUtility");
+			if (utility != null)
+			{
+				_getFieldInfoAndStaticTypeFromProperty = utility.GetMethod("GetFieldInfoAndStaticTypeFromProperty", BindingFlags.NonPublic | BindingFlags.Static);
+			}
+		}
+
+		private static FieldInfo GetFieldInfoAndStaticTypeFromProperty(SerializedProperty property)
+		{
+			if (_getFieldInfoAndStaticTypeFromProperty != null)
+			{
+				Type type = null;
+				var result = _getFieldInfoAndStaticTypeFromProperty.Invoke(null, new object[] {property, type});
+				return result as FieldInfo;
+			}
+
+			return null;
+		}
+
 		public static T GetAttribute<T>(SerializedProperty property) where T : class
 		{
 			T[] attributes = GetAttributes<T>(property);
@@ -17,53 +42,121 @@ namespace NaughtyAttributes.Editor
 
 		public static T[] GetAttributes<T>(SerializedProperty property) where T : class
 		{
-			FieldInfo fieldInfo = ReflectionUtility.GetField(GetTargetObjectWithProperty(property), property.name);
+			var fieldInfo = GetFieldInfoAndStaticTypeFromProperty(property);
 			if (fieldInfo == null)
-			{
-				return new T[] { };
-			}
+				return Array.Empty<T>();
 
-			return (T[])fieldInfo.GetCustomAttributes(typeof(T), true);
+			return (T[]) fieldInfo.GetCustomAttributes(typeof(T), true);
 		}
 
 		public static string GetLabel(SerializedProperty property)
 		{
 			LabelAttribute labelAttribute = GetAttribute<LabelAttribute>(property);
-			return (labelAttribute == null)
-				? property.displayName
-				: labelAttribute.Label;
+			return (labelAttribute == null) ? property.displayName : labelAttribute.Label;
+		}
+
+		public static object GetPropertyValue(SerializedProperty property)
+		{
+			switch (property.propertyType)
+			{
+				case SerializedPropertyType.Integer: return property.intValue;
+				case SerializedPropertyType.Boolean: return property.boolValue;
+				case SerializedPropertyType.Float: return property.floatValue;
+				case SerializedPropertyType.String: return property.stringValue;
+				case SerializedPropertyType.Color: return property.colorValue;
+				case SerializedPropertyType.ObjectReference: return property.objectReferenceValue;
+				case SerializedPropertyType.LayerMask: return property.intValue;
+				case SerializedPropertyType.Enum: return property.enumValueIndex;
+				case SerializedPropertyType.Vector2: return property.vector2Value;
+				case SerializedPropertyType.Vector3: return property.vector3Value;
+				case SerializedPropertyType.Vector4: return property.vector4Value;
+				case SerializedPropertyType.Rect: return property.rectValue;
+				case SerializedPropertyType.ArraySize: return property.intValue;
+				case SerializedPropertyType.Character: return property.intValue;
+				case SerializedPropertyType.AnimationCurve: return property.animationCurveValue;
+				case SerializedPropertyType.Bounds: return property.boundsValue;
+				case SerializedPropertyType.ExposedReference: return property.exposedReferenceValue;
+				case SerializedPropertyType.Vector2Int: return property.vector2IntValue;
+				case SerializedPropertyType.Vector3Int: return property.vector3IntValue;
+				case SerializedPropertyType.RectInt: return property.rectIntValue;
+				case SerializedPropertyType.BoundsInt: return property.boundsIntValue;
+				case SerializedPropertyType.FixedBufferSize: return property.fixedBufferSize;
+				case SerializedPropertyType.Quaternion: return property.quaternionValue;
+				case SerializedPropertyType.ManagedReference: /*return property.managedReferenceValue;*/
+				case SerializedPropertyType.Generic:
+				case SerializedPropertyType.Gradient: /* return property.gradientValue; */
+				default: throw new InvalidOperationException($"Property type ${property.type} is not supported");
+			}
+		}
+
+		public static Type GetPropertyType(SerializedProperty property)
+		{
+			switch (property.propertyType)
+			{
+				case SerializedPropertyType.Integer: return typeof(int);
+				case SerializedPropertyType.Boolean: return typeof(bool);
+				case SerializedPropertyType.Float: return typeof(float);
+				case SerializedPropertyType.String: return typeof(string);
+				case SerializedPropertyType.Color: return typeof(Color);
+				case SerializedPropertyType.ObjectReference: return typeof(object);
+				case SerializedPropertyType.LayerMask: return typeof(int);
+				case SerializedPropertyType.Enum: return typeof(Enum);
+				case SerializedPropertyType.Vector2: return typeof(Vector2);
+				case SerializedPropertyType.Vector3: return typeof(Vector3);
+				case SerializedPropertyType.Vector4: return typeof(Vector4);
+				case SerializedPropertyType.Rect: return typeof(Rect);
+				case SerializedPropertyType.ArraySize: return typeof(int);
+				case SerializedPropertyType.Character: return typeof(int);
+				case SerializedPropertyType.AnimationCurve: return typeof(AnimationCurve);
+				case SerializedPropertyType.Bounds: return typeof(Bounds);
+				case SerializedPropertyType.ExposedReference: return typeof(Object);
+				case SerializedPropertyType.Vector2Int: return typeof(Vector2Int);
+				case SerializedPropertyType.Vector3Int: return typeof(Vector3Int);
+				case SerializedPropertyType.RectInt: return typeof(RectInt);
+				case SerializedPropertyType.BoundsInt: return typeof(BoundsInt);
+				case SerializedPropertyType.FixedBufferSize: return typeof(int);
+				case SerializedPropertyType.Quaternion: return typeof(Quaternion);
+				case SerializedPropertyType.Gradient: /* return property.gradientValue; */
+				case SerializedPropertyType.Generic:
+				case SerializedPropertyType.ManagedReference:
+				default: return null;
+			}
 		}
 
 		public static void CallOnValueChangedCallbacks(SerializedProperty property)
 		{
+			var propertyType = GetPropertyType(property);
+			if (propertyType == null)
+				return;
+
 			object target = GetTargetObjectWithProperty(property);
-			FieldInfo fieldInfo = ReflectionUtility.GetField(target, property.name);
-			object oldValue = fieldInfo.GetValue(target);
+			object oldValue = GetPropertyValue(property);
 			property.serializedObject.ApplyModifiedProperties(); // We must apply modifications so that the new value is updated in the serialized object
-			object newValue = fieldInfo.GetValue(target);
+			object newValue = GetPropertyValue(property);
+			var fieldName = property.name;
 
 			OnValueChangedAttribute[] onValueChangedAttributes = GetAttributes<OnValueChangedAttribute>(property);
 			foreach (var onValueChangedAttribute in onValueChangedAttributes)
 			{
 				MethodInfo callbackMethod = ReflectionUtility.GetMethod(target, onValueChangedAttribute.CallbackName);
 				if (callbackMethod != null &&
-					callbackMethod.ReturnType == typeof(void) &&
-					callbackMethod.GetParameters().Length == 2)
+				    callbackMethod.ReturnType == typeof(void) &&
+				    callbackMethod.GetParameters().Length == 2)
 				{
 					ParameterInfo oldValueParam = callbackMethod.GetParameters()[0];
 					ParameterInfo newValueParam = callbackMethod.GetParameters()[1];
 
-					if (fieldInfo.FieldType == oldValueParam.ParameterType &&
-						fieldInfo.FieldType == newValueParam.ParameterType)
+					if (propertyType == oldValueParam.ParameterType &&
+					    propertyType == newValueParam.ParameterType)
 					{
-						callbackMethod.Invoke(target, new object[] { oldValue, newValue });
+						callbackMethod.Invoke(target, new object[] {oldValue, newValue});
 					}
 					else
 					{
 						string warning = string.Format(
 							"The field '{0}' and the parameters of callback '{1}' must be of the same type." + Environment.NewLine +
 							"Field={2}, Param0={3}, Param1={4}",
-							fieldInfo.Name, callbackMethod.Name, fieldInfo.FieldType, oldValueParam.ParameterType, newValueParam.ParameterType);
+							fieldName, callbackMethod.Name, propertyType, oldValueParam.ParameterType, newValueParam.ParameterType);
 
 						Debug.LogWarning(warning, property.serializedObject.targetObject);
 					}
@@ -87,21 +180,17 @@ namespace NaughtyAttributes.Editor
 				return true;
 			}
 
-			object target = GetTargetObjectWithProperty(property);
-
-			List<bool> conditionValues = GetConditionValues(target, enableIfAttribute.Conditions);
+			var conditionValues = GetConditionValues(property, enableIfAttribute.Conditions);
 			if (conditionValues.Count > 0)
 			{
 				bool enabled = GetConditionsFlag(conditionValues, enableIfAttribute.ConditionOperator, enableIfAttribute.Inverted);
 				return enabled;
 			}
-			else
-			{
-				string message = enableIfAttribute.GetType().Name + " needs a valid boolean condition field, property or method name to work";
-				Debug.LogWarning(message, property.serializedObject.targetObject);
 
-				return false;
-			}
+			string message = enableIfAttribute.GetType().Name + " needs a valid boolean condition field, property or method name to work";
+			Debug.LogWarning(message, property.serializedObject.targetObject);
+
+			return false;
 		}
 
 		public static bool IsVisible(SerializedProperty property)
@@ -112,48 +201,51 @@ namespace NaughtyAttributes.Editor
 				return true;
 			}
 
-			object target = GetTargetObjectWithProperty(property);
-
-			List<bool> conditionValues = GetConditionValues(target, showIfAttribute.Conditions);
+			List<bool> conditionValues = GetConditionValues(property, showIfAttribute.Conditions);
 			if (conditionValues.Count > 0)
 			{
 				bool enabled = GetConditionsFlag(conditionValues, showIfAttribute.ConditionOperator, showIfAttribute.Inverted);
 				return enabled;
 			}
-			else
-			{
-				string message = showIfAttribute.GetType().Name + " needs a valid boolean condition field, property or method name to work";
-				Debug.LogWarning(message, property.serializedObject.targetObject);
 
-				return false;
-			}
+			string message = showIfAttribute.GetType().Name + " needs a valid boolean condition field, property or method name to work";
+			Debug.LogWarning(message, property.serializedObject.targetObject);
+
+			return false;
 		}
 
-		private static List<bool> GetConditionValues(object target, string[] conditions)
+		private static List<bool> GetConditionValues(SerializedProperty property, string[] conditions)
 		{
+			var serializedObject = property.serializedObject;
 			List<bool> conditionValues = new List<bool>();
+			var indexOfDot = property.propertyPath.LastIndexOf('.');
+			var outerPath = indexOfDot == -1 ? "" : property.propertyPath.Substring(0, indexOfDot);
 			foreach (var condition in conditions)
 			{
-				FieldInfo conditionField = ReflectionUtility.GetField(target, condition);
-				if (conditionField != null &&
-					conditionField.FieldType == typeof(bool))
+				var conditionPath = outerPath.Length == 0 ? condition : outerPath + "." + condition;
+				var conditionProperty = serializedObject.FindProperty(conditionPath);
+				if (conditionProperty != null && conditionProperty.propertyType == SerializedPropertyType.Boolean)
+					conditionValues.Add(conditionProperty.boolValue);
+				else
 				{
-					conditionValues.Add((bool)conditionField.GetValue(target));
-				}
+					var target = GetTargetObjectWithProperty(property);
 
-				PropertyInfo conditionProperty = ReflectionUtility.GetProperty(target, condition);
-				if (conditionProperty != null &&
-					conditionProperty.PropertyType == typeof(bool))
-				{
-					conditionValues.Add((bool)conditionProperty.GetValue(target));
-				}
-
-				MethodInfo conditionMethod = ReflectionUtility.GetMethod(target, condition);
-				if (conditionMethod != null &&
-					conditionMethod.ReturnType == typeof(bool) &&
-					conditionMethod.GetParameters().Length == 0)
-				{
-					conditionValues.Add((bool)conditionMethod.Invoke(target, null));
+					var reflectionProperty = ReflectionUtility.GetProperty(target, condition);
+					if (reflectionProperty != null &&
+					    reflectionProperty.PropertyType == typeof(bool))
+					{
+						conditionValues.Add((bool) reflectionProperty.GetValue(target));
+					}
+					else
+					{
+						var reflectionMethod = ReflectionUtility.GetMethod(target, condition);
+						if (reflectionMethod != null &&
+						    reflectionMethod.ReturnType == typeof(bool) &&
+						    reflectionMethod.GetParameters().Length == 0)
+						{
+							conditionValues.Add((bool) reflectionMethod.Invoke(target, null));
+						}
+					}
 				}
 			}
 
@@ -163,29 +255,25 @@ namespace NaughtyAttributes.Editor
 		private static bool GetConditionsFlag(List<bool> conditionValues, EConditionOperator conditionOperator, bool invert)
 		{
 			bool flag;
-			if (conditionOperator == EConditionOperator.And)
+			switch (conditionOperator)
 			{
-				flag = true;
-				foreach (var value in conditionValues)
+				case EConditionOperator.And:
 				{
-					flag = flag && value;
+					flag = true;
+					foreach (var value in conditionValues)
+						flag = flag && value;
+					return invert ? !flag : flag;
 				}
-			}
-			else
-			{
-				flag = false;
-				foreach (var value in conditionValues)
+				case EConditionOperator.Or:
 				{
-					flag = flag || value;
+					flag = false;
+					foreach (var value in conditionValues)
+						flag = flag || value;
+					return invert ? !flag : flag;
 				}
+				default:
+					throw new InvalidOperationException($"Unknown conditional operator {conditionOperator}");
 			}
-
-			if (invert)
-			{
-				flag = !flag;
-			}
-
-			return flag;
 		}
 
 		/// <summary>
@@ -208,8 +296,9 @@ namespace NaughtyAttributes.Editor
 			{
 				if (element.Contains("["))
 				{
-					string elementName = element.Substring(0, element.IndexOf("["));
-					int index = Convert.ToInt32(element.Substring(element.IndexOf("[")).Replace("[", "").Replace("]", ""));
+					var indexOfBracket = element.IndexOf("[", StringComparison.InvariantCulture);
+					string elementName = element.Substring(0, indexOfBracket);
+					int index = Convert.ToInt32(element.Substring(indexOfBracket).Replace("[", "").Replace("]", ""));
 					obj = GetValue_Imp(obj, elementName, index);
 				}
 				else
@@ -237,8 +326,9 @@ namespace NaughtyAttributes.Editor
 				string element = elements[i];
 				if (element.Contains("["))
 				{
-					string elementName = element.Substring(0, element.IndexOf("["));
-					int index = Convert.ToInt32(element.Substring(element.IndexOf("[")).Replace("[", "").Replace("]", ""));
+					var indexOfBracket = element.IndexOf("[", StringComparison.InvariantCulture);
+					string elementName = element.Substring(0, indexOfBracket);
+					int index = Convert.ToInt32(element.Substring(indexOfBracket).Replace("[", "").Replace("]", ""));
 					obj = GetValue_Imp(obj, elementName, index);
 				}
 				else
