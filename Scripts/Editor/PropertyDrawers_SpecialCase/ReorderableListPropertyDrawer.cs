@@ -32,7 +32,11 @@ namespace NaughtyAttributes.Editor
 			{
 				var reorderableList = new ReorderableList(property.serializedObject, property, true, true, true, true)
 				{
-					drawHeaderCallback = (Rect rect) => { EditorGUI.LabelField(rect, $"{label.text}: {property.arraySize}", EditorStyles.boldLabel); },
+					drawHeaderCallback = (Rect rect) =>
+					{
+						EditorGUILayout.Space(8f);
+						EditorGUI.LabelField(rect, $"{label.text}: {property.arraySize}", EditorStyles.boldLabel);
+					},
 
 					drawElementCallback = (Rect rect, int index, bool isActive, bool isFocused) =>
 					{
