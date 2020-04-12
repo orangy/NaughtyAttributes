@@ -34,7 +34,6 @@ namespace NaughtyAttributes.Editor
 				{
 					drawHeaderCallback = (Rect rect) =>
 					{
-						EditorGUILayout.Space(8f);
 						EditorGUI.LabelField(rect, $"{label.text}: {property.arraySize}", EditorStyles.boldLabel);
 					},
 
@@ -54,6 +53,7 @@ namespace NaughtyAttributes.Editor
 				_reorderableListsByPropertyName[key] = reorderableList;
 			}
 
+			EditorGUILayout.Space();
 			_reorderableListsByPropertyName[key].DoLayoutList();
 		}
 

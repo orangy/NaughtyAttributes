@@ -5,8 +5,12 @@ namespace NaughtyAttributes.Test
 {
 	public class ReorderableListTest : MonoBehaviour
 	{
+		public float dummyFloat;
+		
 		[ReorderableList]
 		public int[] intArray;
+
+		public string dummyString;
 
 		[ReorderableList]
 		public List<Vector3> vectorList;
