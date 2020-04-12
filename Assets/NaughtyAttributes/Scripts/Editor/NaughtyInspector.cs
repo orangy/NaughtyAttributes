@@ -144,9 +144,6 @@ namespace NaughtyAttributes.Editor
 			if (_methods.Any())
 			{
 				EditorGUILayout.Space();
-				EditorGUILayout.LabelField("Buttons", GetHeaderGUIStyle());
-				NaughtyEditorGUI.HorizontalLine(
-					EditorGUILayout.GetControlRect(false), HorizontalLineAttribute.DefaultHeight, HorizontalLineAttribute.DefaultColor.GetColor());
 
 				foreach (var method in _methods)
 				{
